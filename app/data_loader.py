@@ -3,7 +3,7 @@ import yfinance as yf
 from datetime import datetime, timedelta
 import os
 
-DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 
 CSV_MAP = {
     "1min":  "/home/ganesh/code/backtest_project/data/NIFTY 50_minute.csv",

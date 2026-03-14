@@ -23,8 +23,8 @@
 
 
 print("Testing backtesting framework...")
-from src.data_loader import load_data
-from src.backtest_runner import run_backtest
+from app.data_loader import load_data
+from app.backtest_runner import run_backtest
 
 df = load_data("15min", "full")
 
