@@ -145,6 +145,16 @@
   ::-webkit-scrollbar { width: 5px; }
   ::-webkit-scrollbar-track { background: var(--bg); }
   ::-webkit-scrollbar-thumb { background: var(--bg3); border-radius: 3px; }
+
+  .range-btns { display: flex; gap: 4px; align-items: center; }
+.range-btn {
+  background: transparent; border: 1px solid var(--border);
+  color: var(--muted); padding: 3px 8px; border-radius: var(--radius);
+  font-size: 11px; cursor: pointer; transition: all .15s;
+}
+.range-btn:hover { border-color: var(--blue); color: var(--text); }
+.range-btn.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+
 </style>
 </head>
 <body>
@@ -250,20 +260,27 @@ def generate_signals(df):
 
   <!-- MAIN CHART AREA -->
   <div class="main-area">
-    <div class="chart-toolbar">
-      <span class="ticker">^NSEI — Nifty 50</span>
-      <span>
-        <span class="legend-dot" style="background:var(--amber)"></span>SMA 44
-      </span>
-      <span>
-        <span class="legend-dot" style="background:var(--green)"></span>Buy
-      </span>
-      <span>
-        <span class="legend-dot" style="background:var(--red)"></span>Sell
-      </span>
-      <div class="spacer"></div>
-      <div class="ohlc-display" id="ohlc-display"></div>
-    </div>
+<div class="chart-toolbar">
+  <span class="ticker">NSEI — Nifty 50</span>
+  <span>
+    <span class="legend-dot" style="background:var(--amber)"></span>SMA 44
+  </span>
+  <span>
+    <span class="legend-dot" style="background:var(--green)"></span>Buy
+  </span>
+  <span>
+    <span class="legend-dot" style="background:var(--red)"></span>Sell
+  </span>
+  <div class="spacer"></div>
+  <div class="range-btns" id="range-btns" style="display:none">
+    <button class="range-btn" onclick="setRange('1M')">1M</button>
+    <button class="range-btn" onclick="setRange('3M')">3M</button>
+    <button class="range-btn" onclick="setRange('6M')">6M</button>
+    <button class="range-btn" onclick="setRange('1Y')">1Y</button>
+    <button class="range-btn active" onclick="setRange('ALL')">All</button>
+  </div>
+  <div class="ohlc-display" id="ohlc-display"></div>
+</div>
 
     <div id="main-chart">
       <div class="empty-state" id="empty-state">
@@ -322,13 +339,23 @@ async function runBacktest() {
 
 // ── RENDER ALL ────────────────────────────────────────────────────────────
 
+// function renderAll(data, interval) {
+//   renderChart(data.candles, data.signals);
+//   renderMetrics(data.metrics);
+//   renderEquityCurve(data.equity_curve);
+//   renderTrades(data.trades);
+//   document.getElementById('empty-state')?.remove();
+// }
+
 function renderAll(data, interval) {
   renderChart(data.candles, data.signals);
   renderMetrics(data.metrics);
   renderEquityCurve(data.equity_curve);
   renderTrades(data.trades);
+  document.getElementById('range-btns').style.display = 'flex'; 
   document.getElementById('empty-state')?.remove();
 }
+
 
 // ── CANDLESTICK CHART ─────────────────────────────────────────────────────
 
@@ -389,7 +416,7 @@ function renderChart(candles, signals) {
     size:     2,
 }));
   candleSeries.setMarkers(markers);
-  
+
   // draw SL and TP lines for each signal
 signals.forEach(s => {
     const slColor = s.type === 'buy' ? '#ef535066' : '#ef535066';
@@ -589,6 +616,26 @@ document.getElementById('code-input').addEventListener('keydown', e => {
     e.target.selectionStart = e.target.selectionEnd = s + 4;
   }
 });
+function setRange(range) {
+  if (!chartInstance) return;
+
+  // update active button
+  document.querySelectorAll('.range-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent === range);
+  });
+
+  if (range === 'ALL') {
+    chartInstance.timeScale().fitContent();
+    return;
+  }
+
+  const now   = Math.floor(Date.now() / 1000);
+  const days  = { '1M': 30, '3M': 90, '6M': 180, '1Y': 365 };
+  const from  = now - (days[range] * 24 * 60 * 60);
+
+  chartInstance.timeScale().setVisibleRange({ from, to: now });
+}
+
 </script>
 </body>
 </html>
