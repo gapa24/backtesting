@@ -1,7 +1,7 @@
 fastapi
 uvicorn[standard]
 pandas
-pandas-ta==0.4.71b0
+pandas-ta==0.4.71b0python 
 yfinance
 backtesting
 numpy
