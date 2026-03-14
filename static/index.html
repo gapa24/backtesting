@@ -382,13 +382,46 @@ function renderChart(candles, signals) {
   // buy / sell markers
   const markers = signals.map(s => ({
     time:     s.time,
-    position: s.type === 'buy' ? 'belowBar' : 'aboveBar',
-    color:    s.type === 'buy' ? '#26a69a'  : '#ef5350',
-    shape:    s.type === 'buy' ? 'arrowUp'  : 'arrowDown',
-    text:     s.type === 'buy' ? 'B'        : 'S',
-    size:     1,
-  }));
+    position: s.type === 'buy' ? 'belowBar'  : 'aboveBar',
+    color:    s.type === 'buy' ? '#00e5c3'   : '#ff4d4d',
+    shape:    s.type === 'buy' ? 'arrowUp'   : 'arrowDown',
+    text:     s.type === 'buy' ? `▲ ${s.price}` : `▼ ${s.price}`,
+    size:     2,
+}));
   candleSeries.setMarkers(markers);
+  
+  // draw SL and TP lines for each signal
+signals.forEach(s => {
+    const slColor = s.type === 'buy' ? '#ef535066' : '#ef535066';
+    const tpColor = s.type === 'buy' ? '#26a69a66' : '#26a69a66';
+
+    const slLine = chartInstance.addLineSeries({
+        color:             slColor,
+        lineWidth:         1,
+        lineStyle:         2,  // dashed
+        priceLineVisible:  false,
+        lastValueVisible:  false,
+        crosshairMarkerVisible: false,
+    });
+    slLine.setData([
+        { time: s.time, value: s.stop },
+        { time: s.time + 3600, value: s.stop },
+    ]);
+
+    const tpLine = chartInstance.addLineSeries({
+        color:             tpColor,
+        lineWidth:         1,
+        lineStyle:         2,
+        priceLineVisible:  false,
+        lastValueVisible:  false,
+        crosshairMarkerVisible: false,
+    });
+    tpLine.setData([
+        { time: s.time, value: s.target },
+        { time: s.time + 3600, value: s.target },
+    ]);
+});
+
 
   // crosshair OHLC display
   chartInstance.subscribeCrosshairMove(param => {
