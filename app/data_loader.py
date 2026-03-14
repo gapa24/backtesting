@@ -6,9 +6,9 @@ import os
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 
 CSV_MAP = {
-    "1min":  "/home/ganesh/code/backtest_project/data/NIFTY 50_minute.csv",
-    "5min":  "/home/ganesh/code/backtest_project/data/NIFTY 50_5minute.csv",
-    "15min": "/home/ganesh/code/backtest_project/data/NIFTY 50_15minute.csv",
+    "1min":  "NIFTY 50_minute.csv",
+    "5min":  "NIFTY 50_5minute.csv",
+    "15min": "NIFTY 50_15minute.csv",
 }
 
 RESAMPLE_MAP = {
