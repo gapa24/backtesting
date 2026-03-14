@@ -7,8 +7,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from src.data_loader import load_data
-from src.backtest_runner import run_backtest
+from app.data_loader import load_data
+from app.backtest_runner import run_backtest
 
 # ---------------------------------------------------------------------------
 # App setup
@@ -17,7 +17,7 @@ from src.backtest_runner import run_backtest
 app = FastAPI(title="Backtester", version="1.0.0")
 
 BASE_DIR    = Path(__file__).parent
-STATIC_DIR  = BASE_DIR / "static"
+STATIC_DIR = BASE_DIR.parent / "static"
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
@@ -121,7 +121,7 @@ def backtest(req: BacktestRequest):
 if __name__ == "__main__":
     import uvicorn
     import os 
-    
+
     uvicorn.run(
         "src.main:app",
         host="0.0.0.0",
