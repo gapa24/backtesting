@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Nifty 50 Backtester</title>
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #131722;
+    --bg2:       #1e222d;
+    --bg3:       #2a2e39;
+    --border:    #2a2e39;
+    --text:      #d1d4dc;
+    --muted:     #787b86;
+    --green:     #26a69a;
+    --red:       #ef5350;
+    --blue:      #2962ff;
+    --amber:     #f59f00;
+    --radius:    4px;
+    --font:      -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 13px; }
+
+  /* ── TOP BAR ── */
+  .topbar {
+    height: 52px; background: var(--bg2); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px; padding: 0 16px;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .topbar-logo { font-size: 15px; font-weight: 700; color: var(--text); margin-right: 4px; letter-spacing: -.3px; }
+  .topbar-logo span { color: var(--blue); }
+  .topbar select, .topbar input {
+    background: var(--bg3); border: 1px solid var(--border); color: var(--text);
+    padding: 5px 10px; border-radius: var(--radius); font-size: 12px; outline: none; cursor: pointer;
+  }
+  .topbar select:focus, .topbar input:focus { border-color: var(--blue); }
+  .topbar label { font-size: 11px; color: var(--muted); }
+  .spacer { flex: 1; }
+  .run-btn {
+    background: var(--blue); color: #fff; border: none; padding: 7px 20px;
+    border-radius: var(--radius); font-size: 12px; font-weight: 600; cursor: pointer;
+    transition: background .15s;
+  }
+  .run-btn:hover { background: #1e53e5; }
+  .run-btn:disabled { background: var(--bg3); color: var(--muted); cursor: not-allowed; }
+
+  /* ── LAYOUT ── */
+  .app { display: flex; height: calc(100vh - 52px); }
+
+  /* ── LEFT PANEL ── */
+  .left-panel {
+    width: 300px; min-width: 260px; background: var(--bg2);
+    border-right: 1px solid var(--border); display: flex; flex-direction: column;
+    overflow-y: auto;
+  }
+  .panel-section { padding: 14px; border-bottom: 1px solid var(--border); }
+  .panel-title {
+    font-size: 10px; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .7px; margin-bottom: 10px;
+  }
+  .code-box {
+    width: 100%; height: 240px; background: var(--bg); border: 1px solid var(--border);
+    border-radius: var(--radius); color: #abb2bf; font-family: 'Courier New', monospace;
+    font-size: 11px; line-height: 1.6; padding: 10px; resize: vertical; outline: none;
+    tab-size: 4;
+  }
+  .code-box:focus { border-color: var(--blue); }
+  .code-hint { font-size: 10px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+
+  /* ── METRICS ── */
+  .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+  .metric-card { background: var(--bg); border-radius: var(--radius); padding: 9px 11px; }
+  .metric-label { font-size: 10px; color: var(--muted); margin-bottom: 3px; }
+  .metric-value { font-size: 17px; font-weight: 600; }
+  .pos { color: var(--green); }
+  .neg { color: var(--red); }
+  .neu { color: var(--text); }
+
+  /* ── EQUITY CURVE ── */
+  #equity-chart { width: 100%; height: 80px; }
+
+  /* ── TRADES ── */
+  .trade-list { display: flex; flex-direction: column; gap: 0; }
+  .trade-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 0; border-bottom: 1px solid #2a2e3940; font-size: 11px;
+  }
+  .trade-badge {
+    padding: 2px 7px; border-radius: 3px; font-size: 10px; font-weight: 700;
+    min-width: 36px; text-align: center;
+  }
+  .trade-badge.buy  { background: #26a69a22; color: var(--green); }
+  .trade-badge.sell { background: #ef535022; color: var(--red); }
+  .trade-time { color: var(--muted); flex: 1; }
+  .trade-pnl { font-weight: 600; min-width: 48px; text-align: right; }
+
+  /* ── MAIN CHART AREA ── */
+  .main-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .chart-toolbar {
+    height: 36px; background: var(--bg2); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 16px; padding: 0 14px; font-size: 11px; color: var(--muted);
+  }
+  .chart-toolbar .ticker { font-size: 13px; font-weight: 600; color: var(--text); }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+  .ohlc-display { display: flex; gap: 10px; font-size: 11px; }
+  .ohlc-display span { color: var(--muted); }
+  .ohlc-display b   { color: var(--text); }
+
+  #main-chart { flex: 1; }
+
+  /* ── EMPTY / ERROR STATES ── */
+  .empty-state {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; color: var(--muted); gap: 10px;
+  }
+  .empty-icon { font-size: 36px; opacity: .4; }
+  .empty-text { font-size: 13px; }
+
+  .error-bar {
+    background: #ef535018; border: 1px solid #ef535040; color: #ef9090;
+    padding: 8px 14px; font-size: 12px; border-radius: var(--radius);
+    margin: 10px 14px; display: none; line-height: 1.5;
+  }
+
+  /* ── LOADING OVERLAY ── */
+  .loading-overlay {
+    display: none; position: absolute; inset: 0;
+    background: #131722cc; align-items: center; justify-content: center;
+    flex-direction: column; gap: 12px; z-index: 50;
+  }
+  .loading-overlay.active { display: flex; }
+  .spinner {
+    width: 28px; height: 28px; border: 3px solid var(--bg3);
+    border-top-color: var(--blue); border-radius: 50%;
+    animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { font-size: 12px; color: var(--muted); }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--bg3); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-logo">Nifty<span>BT</span></div>
+
+  <label>Interval</label>
+  <select id="interval-select">
+    <option value="5min">5 min</option>
+    <option value="15min" selected>15 min</option>
+    <option value="30min">30 min</option>
+    <option value="10min">10 min</option>
+    <option value="1min">1 min</option>
+  </select>
+
+  <label>Period</label>
+  <select id="period-select">
+    <option value="full" selected>Full history (CSV)</option>
+    <option value="60d">Last 60 days (live)</option>
+  </select>
+
+  <div class="spacer"></div>
+  <button class="run-btn" id="run-btn" onclick="runBacktest()">&#9654; Run Backtest</button>
+</div>
+
+<!-- APP BODY -->
+<div class="app" style="position:relative">
+
+  <!-- LOADING OVERLAY -->
+  <div class="loading-overlay" id="loading">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loading-text">Running backtest...</div>
+  </div>
+
+  <!-- LEFT PANEL -->
+  <div class="left-panel">
+
+    <div class="panel-section">
+      <div class="panel-title">Strategy code</div>
+      <textarea class="code-box" id="code-input" spellcheck="false" placeholder="Paste your converted Python strategy here...">import pandas_ta as ta
+
+def generate_signals(df):
+    df['sma44'] = ta.sma(df['Close'], length=44)
+    df['atr']   = ta.atr(df['High'], df['Low'], df['Close'], length=14)
+
+    bull = (
+        (df['Close'] > df['Open']) &
+        (df['Open']  <= df['Close'].shift(1)) &
+        (df['Close'] >= df['Open'].shift(1))
+    )
+    bear = (
+        (df['Close'] < df['Open']) &
+        (df['Open']  >= df['Close'].shift(1)) &
+        (df['Close'] <= df['Open'].shift(1))
+    )
+    near_ma = df['sma44'].notna() & (
+        abs(df['Close'] - df['sma44']) <= df['atr'] * 0.2
+    )
+    long_cond  = (df['Close'] > df['sma44']) & near_ma & bull
+    short_cond = (df['Close'] < df['sma44']) & near_ma & bear
+
+    df['signal']      = 0
+    df['stop_loss']   = None
+    df['take_profit'] = None
+
+    df.loc[long_cond,  'signal']      = 1
+    df.loc[long_cond,  'stop_loss']   = df['Low']
+    df.loc[long_cond,  'take_profit'] = df['Close'] + (df['Close'] - df['Low']) * 1.5
+
+    df.loc[short_cond, 'signal']      = -1
+    df.loc[short_cond, 'stop_loss']   = df['High']
+    df.loc[short_cond, 'take_profit'] = df['Close'] - (df['High'] - df['Close']) * 1.5
+
+    return df</textarea>
+      <div class="code-hint">
+        Use <code>df['Close']</code>, <code>df['Open']</code>, <code>df['High']</code>, <code>df['Low']</code>.<br>
+        Must return <code>df</code> with <code>signal</code>, <code>stop_loss</code>, <code>take_profit</code>.
+      </div>
+    </div>
+
+    <div class="panel-section" id="error-section" style="display:none">
+      <div class="error-bar" id="error-bar" style="display:block"></div>
+    </div>
+
+    <div class="panel-section" id="metrics-section" style="display:none">
+      <div class="panel-title">Performance</div>
+      <div class="metric-grid" id="metrics-grid"></div>
+    </div>
+
+    <div class="panel-section" id="equity-section" style="display:none">
+      <div class="panel-title">Equity curve</div>
+      <canvas id="equity-chart"></canvas>
+    </div>
+
+    <div class="panel-section" id="trades-section" style="display:none">
+      <div class="panel-title">Recent trades</div>
+      <div class="trade-list" id="trade-list"></div>
+    </div>
+
+  </div>
+
+  <!-- MAIN CHART AREA -->
+  <div class="main-area">
+    <div class="chart-toolbar">
+      <span class="ticker">^NSEI — Nifty 50</span>
+      <span>
+        <span class="legend-dot" style="background:var(--amber)"></span>SMA 44
+      </span>
+      <span>
+        <span class="legend-dot" style="background:var(--green)"></span>Buy
+      </span>
+      <span>
+        <span class="legend-dot" style="background:var(--red)"></span>Sell
+      </span>
+      <div class="spacer"></div>
+      <div class="ohlc-display" id="ohlc-display"></div>
+    </div>
+
+    <div id="main-chart">
+      <div class="empty-state" id="empty-state">
+        <div class="empty-icon">&#9654;</div>
+        <div class="empty-text">Paste your strategy and hit Run Backtest</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const API = '';  // same origin — empty string means relative URL
+
+let chartInstance   = null;
+let candleSeries    = null;
+let smaSeries       = null;
+let buyMarkers      = [];
+let sellMarkers     = [];
+
+// ── RUN BACKTEST ──────────────────────────────────────────────────────────
+
+async function runBacktest() {
+  const code     = document.getElementById('code-input').value.trim();
+  const interval = document.getElementById('interval-select').value;
+  const period   = document.getElementById('period-select').value;
+
+  if (!code) { showError('Please paste your strategy code first.'); return; }
+
+  setLoading(true, 'Loading data...');
+  hideError();
+
+  try {
+    setLoading(true, 'Running backtest...');
+    const res = await fetch(`${API}/backtest`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ code, interval, period }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      showError(data.detail || 'Backtest failed. Check your strategy code.');
+      return;
+    }
+
+    renderAll(data, interval);
+
+  } catch (err) {
+    showError('Could not reach the server. Is it running?');
+  } finally {
+    setLoading(false);
+  }
+}
+
+// ── RENDER ALL ────────────────────────────────────────────────────────────
+
+function renderAll(data, interval) {
+  renderChart(data.candles, data.signals);
+  renderMetrics(data.metrics);
+  renderEquityCurve(data.equity_curve);
+  renderTrades(data.trades);
+  document.getElementById('empty-state')?.remove();
+}
+
+// ── CANDLESTICK CHART ─────────────────────────────────────────────────────
+
+function renderChart(candles, signals) {
+  const container = document.getElementById('main-chart');
+
+  // destroy previous instance
+  if (chartInstance) { chartInstance.remove(); chartInstance = null; }
+
+  chartInstance = LightweightCharts.createChart(container, {
+    width:  container.clientWidth,
+    height: container.clientHeight,
+    layout: {
+      background: { color: '#131722' },
+      textColor:  '#787b86',
+    },
+    grid: {
+      vertLines:  { color: '#1e222d' },
+      horzLines:  { color: '#1e222d' },
+    },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    rightPriceScale: { borderColor: '#2a2e39' },
+    timeScale: {
+      borderColor:      '#2a2e39',
+      timeVisible:      true,
+      secondsVisible:   false,
+    },
+  });
+
+  // candle series
+  candleSeries = chartInstance.addCandlestickSeries({
+    upColor:          '#26a69a',
+    downColor:        '#ef5350',
+    borderUpColor:    '#26a69a',
+    borderDownColor:  '#ef5350',
+    wickUpColor:      '#26a69a',
+    wickDownColor:    '#ef5350',
+  });
+  candleSeries.setData(candles);
+
+  // SMA 44 line — compute from candles
+  const smaData = computeSMA(candles, 44);
+  smaSeries = chartInstance.addLineSeries({
+    color:       '#f59f00',
+    lineWidth:   1,
+    priceLineVisible: false,
+    lastValueVisible: false,
+  });
+  smaSeries.setData(smaData);
+
+  // buy / sell markers
+  const markers = signals.map(s => ({
+    time:     s.time,
+    position: s.type === 'buy' ? 'belowBar' : 'aboveBar',
+    color:    s.type === 'buy' ? '#26a69a'  : '#ef5350',
+    shape:    s.type === 'buy' ? 'arrowUp'  : 'arrowDown',
+    text:     s.type === 'buy' ? 'B'        : 'S',
+    size:     1,
+  }));
+  candleSeries.setMarkers(markers);
+
+  // crosshair OHLC display
+  chartInstance.subscribeCrosshairMove(param => {
+    if (!param.time || !param.seriesData) return;
+    const c = param.seriesData.get(candleSeries);
+    if (!c) return;
+    const el = document.getElementById('ohlc-display');
+    const col = c.close >= c.open ? '#26a69a' : '#ef5350';
+    el.innerHTML = `
+      <span>O</span><b>${fmt(c.open)}</b>
+      <span>H</span><b>${fmt(c.high)}</b>
+      <span>L</span><b>${fmt(c.low)}</b>
+      <span>C</span><b style="color:${col}">${fmt(c.close)}</b>`;
+  });
+
+  // resize observer
+  const ro = new ResizeObserver(() => {
+    if (chartInstance) {
+      chartInstance.applyOptions({
+        width:  container.clientWidth,
+        height: container.clientHeight,
+      });
+    }
+  });
+  ro.observe(container);
+
+  // fit content
+  chartInstance.timeScale().fitContent();
+}
+
+// ── SMA HELPER ────────────────────────────────────────────────────────────
+
+function computeSMA(candles, period) {
+  const result = [];
+  for (let i = period - 1; i < candles.length; i++) {
+    const slice = candles.slice(i - period + 1, i + 1);
+    const avg   = slice.reduce((s, c) => s + c.close, 0) / period;
+    result.push({ time: candles[i].time, value: parseFloat(avg.toFixed(2)) });
+  }
+  return result;
+}
+
+// ── METRICS ───────────────────────────────────────────────────────────────
+
+function renderMetrics(m) {
+  const defs = [
+    { key: 'return',        label: 'Net return',     fmt: v => pct(v),           cls: v => v >= 0 ? 'pos' : 'neg' },
+    { key: 'win_rate',      label: 'Win rate',        fmt: v => pct(v),           cls: () => 'neu' },
+    { key: 'max_drawdown',  label: 'Max drawdown',    fmt: v => pct(v),           cls: () => 'neg' },
+    { key: 'sharpe',        label: 'Sharpe ratio',    fmt: v => v.toFixed(2),     cls: v => v >= 1 ? 'pos' : 'neu' },
+    { key: 'total_trades',  label: 'Total trades',    fmt: v => v,                cls: () => 'neu' },
+    { key: 'profit_factor', label: 'Profit factor',   fmt: v => v.toFixed(2),     cls: v => v >= 1 ? 'pos' : 'neg' },
+    { key: 'best_trade',    label: 'Best trade',      fmt: v => pct(v),           cls: () => 'pos' },
+    { key: 'worst_trade',   label: 'Worst trade',     fmt: v => pct(v),           cls: () => 'neg' },
+    { key: 'buy_hold',      label: 'Buy & hold',      fmt: v => pct(v),           cls: v => v >= 0 ? 'pos' : 'neg' },
+    { key: 'exposure',      label: 'Exposure',        fmt: v => pct(v),           cls: () => 'neu' },
+  ];
+
+  const grid = document.getElementById('metrics-grid');
+  grid.innerHTML = defs.map(d => {
+    const val = m[d.key] ?? 0;
+    return `<div class="metric-card">
+      <div class="metric-label">${d.label}</div>
+      <div class="metric-value ${d.cls(val)}">${d.fmt(val)}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('metrics-section').style.display = 'block';
+}
+
+// ── EQUITY CURVE ──────────────────────────────────────────────────────────
+
+function renderEquityCurve(equityData) {
+  if (!equityData || equityData.length < 2) return;
+
+  const canvas  = document.getElementById('equity-chart');
+  const ctx     = canvas.getContext('2d');
+  const W       = canvas.parentElement.clientWidth - 28;
+  const H       = 80;
+  canvas.width  = W;
+  canvas.height = H;
+
+  const values = equityData.map(e => e.value);
+  const minV   = Math.min(...values);
+  const maxV   = Math.max(...values);
+  const range  = maxV - minV || 1;
+
+  const xs = (i) => (i / (values.length - 1)) * W;
+  const ys = (v) => H - ((v - minV) / range) * (H - 8) - 4;
+
+  const isProfit = values[values.length - 1] >= values[0];
+  const lineCol  = isProfit ? '#26a69a' : '#ef5350';
+  const fillCol  = isProfit ? '#26a69a18' : '#ef535018';
+
+  ctx.clearRect(0, 0, W, H);
+
+  // fill
+  ctx.beginPath();
+  ctx.moveTo(xs(0), H);
+  values.forEach((v, i) => ctx.lineTo(xs(i), ys(v)));
+  ctx.lineTo(xs(values.length - 1), H);
+  ctx.closePath();
+  ctx.fillStyle = fillCol;
+  ctx.fill();
+
+  // line
+  ctx.beginPath();
+  values.forEach((v, i) => i === 0 ? ctx.moveTo(xs(i), ys(v)) : ctx.lineTo(xs(i), ys(v)));
+  ctx.strokeStyle = lineCol;
+  ctx.lineWidth   = 1.5;
+  ctx.stroke();
+
+  document.getElementById('equity-section').style.display = 'block';
+}
+
+// ── TRADES ────────────────────────────────────────────────────────────────
+
+function renderTrades(trades) {
+  if (!trades || trades.length === 0) return;
+
+  const list = document.getElementById('trade-list');
+  list.innerHTML = trades.slice().reverse().map(t => {
+    const pnlCls = t.pnl_pct >= 0 ? 'pos' : 'neg';
+    const pnlStr = (t.pnl_pct >= 0 ? '+' : '') + t.pnl_pct.toFixed(2) + '%';
+    const time   = t.entry_time ? t.entry_time.slice(0, 16) : '';
+    return `<div class="trade-row">
+      <span class="trade-badge ${t.type}">${t.type.toUpperCase()}</span>
+      <span class="trade-time">${time}</span>
+      <span class="trade-pnl ${pnlCls}">${pnlStr}</span>
+    </div>`;
+  }).join('');
+
+  document.getElementById('trades-section').style.display = 'block';
+}
+
+// ── UI HELPERS ────────────────────────────────────────────────────────────
+
+function setLoading(on, text) {
+  const el = document.getElementById('loading');
+  el.classList.toggle('active', on);
+  if (text) document.getElementById('loading-text').textContent = text;
+  document.getElementById('run-btn').disabled = on;
+}
+
+function showError(msg) {
+  const bar = document.getElementById('error-bar');
+  const sec = document.getElementById('error-section');
+  bar.textContent = msg;
+  sec.style.display = 'block';
+}
+
+function hideError() {
+  document.getElementById('error-section').style.display = 'none';
+}
+
+function fmt(v)  { return v?.toLocaleString('en-IN', { maximumFractionDigits: 2 }) ?? ''; }
+function pct(v)  { return (v >= 0 ? '+' : '') + v.toFixed(2) + '%'; }
+
+// allow Tab key in textarea
+document.getElementById('code-input').addEventListener('keydown', e => {
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const s = e.target.selectionStart;
+    e.target.value = e.target.value.substring(0, s) + '    ' + e.target.value.substring(e.target.selectionEnd);
+    e.target.selectionStart = e.target.selectionEnd = s + 4;
+  }
+});
+</script>
+</body>
+</html>
